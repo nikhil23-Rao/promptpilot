@@ -8,17 +8,102 @@
       padding: 0;
       width: 100vw;
       height: 100vh;
-      background: transparent; /* Transparent background */
+      background: transparent;
       box-sizing: border-box;
     }
     body {
       font-family: sans-serif;
       color: white;
-      display: flex;
-      align-items: flex-start;
-      justify-content: center;
+      width: 100vw;
       height: 100vh;
       background: transparent;
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      padding-bottom: 8px; /* Increased from 32px to 48px to move toolbar down */
+    }
+    .toolbar {
+      width: 600px;
+      height: 56px;
+      background: rgba(34, 34, 34, 0.45); /* More transparent for glass effect */
+      border-radius: 28px;
+      box-shadow: 0 2px 16px rgba(0,0,0,0.25);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      gap: 16px;
+      backdrop-filter: blur(16px) saturate(160%); /* Glassmorphism effect */
+      -webkit-backdrop-filter: blur(16px) saturate(160%);
+      border: 1px solid rgba(255,255,255,0.12); /* Subtle border for glass look */
+    }
+    .toolbar-section {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      /* Removed glassy background, border, and filter */
+      border-radius: 12px;
+      padding: 2px 8px;
+    }
+    .toolbar-section p {
+      /* Removed glassy background, border, filter, and shadow */
+      background: none;
+      border-radius: 8px;
+      padding: 4px 12px;
+      margin: 0;
+      color: #e0e6f8;
+      font-weight: 500;
+    }
+    .toolbar-btn {
+      background: none;
+      border: none;
+      color: #b8c1ec;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      cursor: pointer;
+      padding: 6px 12px;
+      border-radius: 10px;
+      transition: background 0.15s, color 0.15s;
+      /* Removed glassy background, border, filter, and shadow */
+    }
+    .toolbar-btn:hover {
+      background: rgba(80, 80, 120, 0.22);
+      color: #fff;
+    }
+    .toolbar-timer {
+      font-size: 17px;
+      color: #e0e6f8;
+      font-family: monospace;
+      margin: 0 10px;
+      min-width: 48px;
+      text-align: center;
+      letter-spacing: 1px;
+      /* Removed glassy background, border, filter, and shadow */
+      background: none;
+      border-radius: 6px;
+      padding: 2px 8px;
+    }
+    .toolbar-circular-btn {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      background: none;
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-left: 8px;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+      color: #b8c1ec;
+      font-size: 20px;
+      /* Removed glassy background, border, filter, and shadow */
+    }
+    .toolbar-circular-btn:hover {
+      background: #1976d2cc;
+      color: #fff;
     }
     input {
       width: 90%;
@@ -33,9 +118,27 @@
       margin-top: 10px;
     }
   </style>
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 </head>
 <body>
-  <input id="search" placeholder="Promptpilot: Listening..." disabled style="text-align: center;" autofocus />
+  <div class="toolbar">
+    <div class="toolbar-section" style="gap:16px;">
+      <ul style="list-style:none; margin:0; padding:0; display:flex; gap:16px;">
+        <p style="color: #e0e6f8;">promptpilot</p>
+        <li style="background:rgba(80,80,120,0.18); color:#e0e6f8; border-radius:16px; padding:4px 10px; font-size:15px; box-shadow:0 1px 6px rgba(0,0,0,0.10); border:1px solid rgba(255,255,255,0.10);">
+        turn on autocomplete
+        </li>
+      </ul>
+    </div>
+    <div class="toolbar-section">
+      <button class="toolbar-circular-btn" title="Help">
+        <span class="material-icons">help_outline</span>
+      </button>
+      <button class="toolbar-circular-btn" title="More">
+        <span class="material-icons">more_vert</span>
+      </button>
+    </div>
+  </div>
   <script>
     const input = document.getElementById('search');
     input.focus();

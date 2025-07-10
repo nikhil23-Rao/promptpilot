@@ -2,6 +2,9 @@ from collections import Counter
 import os
 from litellm import completion
 import math
+from flask import Flask, request, jsonify
+
+app = Flask(__name__)
 
 
 def call_llm(prompt):
@@ -76,7 +79,7 @@ def optimize_prompt_confidence(original_prompt, max_attempts=3, weights=None):
         weights = {"logprob": 1.0, "entropy": -0.5}
 
     og_res = completion(
-        model="gpt-4o-mini",
+        model="gpt-3.5-turbo",
         temperature=0,
         max_tokens=250,
         messages=[{"role": "user", "content": original_prompt}],
@@ -93,7 +96,7 @@ def optimize_prompt_confidence(original_prompt, max_attempts=3, weights=None):
 
         # Generate response to new prompt
         response = completion(
-            model="gpt-4o-mini",
+            model="gpt-3.5-turbo",
             temperature=0,
             max_tokens=250,
             messages=[{"role": "user", "content": new_prompt}],
@@ -132,6 +135,22 @@ def autocomplete(prompt):
     return response.choices[0].message.content
 
 
-print(optimize_prompt_confidence(
-    """whats coppilot vscoce""", 3)
-)
+@app.route("/optimize", methods=["POST"])
+def api_optimize():
+    data = request.get_json(force=True)
+    prompt = data.get("prompt", "")
+    max_attempts = int(data.get("max_attempts", 3))
+    best_prompt, best_score = optimize_prompt_confidence(prompt, max_attempts)
+    return jsonify({"optimized_prompt": best_prompt, "confidence": best_score})
+
+
+@app.route("/autocomplete", methods=["POST"])
+def api_autocomplete():
+    data = request.get_json(force=True)
+    prompt = data.get("prompt", "")
+    suggestion = autocomplete(prompt)
+    return jsonify({"autocomplete": suggestion})
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=1001)
