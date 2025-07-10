@@ -3,21 +3,14 @@ import os
 from litellm import completion
 import math
 
-rewritten_response = completion(
-    model="gpt-4o-mini",
-    messages=[{"role": "user", "content": """Write a polite and professional email to a colleague requesting a 30-minute meeting next week to discuss project updates. Use a formal tone and include a suggested time."""}],
-    logprobs=True,
-    temperature=0
-)
 
-
-original_response = completion(
-    model="gpt-4o-mini",
-    messages=[
-        {"role": "user", "content": """Write an email to ask someone for a meeting."""}],
-    logprobs=True,
-    temperature=0
-)
+def call_llm(prompt):
+    return completion(
+        model="gpt-3.5-turbo",
+        messages=[{"role": "user", "content": prompt}],
+        logprobs=True,
+        temperature=0
+    )
 
 
 def get_new_prompt(original_prompt):
@@ -26,209 +19,27 @@ def get_new_prompt(original_prompt):
         "maximize LLM output confidence (i.e., higher average token probability). "
         "Rewrite the user's prompt so that the LLM's output will be more confident, "
         "clear, concise, and unambiguous."
+
+        "examples:"
+        "Original: condicional spanish ireegulars\n"
+        "return: 'Identify and list the irregular verbs in Spanish's conditional tense, providing examples for each irregular verb.'\n\n"
     )
 
     user_message = (
         f"Original prompt:\n{original_prompt}\n\n"
         "Rewrite this prompt to maximize the LLM's confidence when answering. "
-        "Make it clear, specific, and simple. Return the optimized prompt."
+        "Don't remove/rephrase text if a user provides a blurb,article, or any external text it wants the LLM to read."
+        "Make it clear, specific, and simple. Feel free to add any information that would make the prompt more clear. **RETURN THE STRING OF THE OPTIMIZED PROMPT ONLY**."
     )
 
     new_prompt = completion(
-        model="gpt-4o-mini",
+        model="gpt-3.5-turbo",
         messages=[
             {"role": "system", "content": system_message},
             {"role": "user", "content": user_message},
         ],
     )
     return new_prompt.choices[0].message.content
-
-
-def compute_entropy_margin_score(response, alpha=0.5, beta=0.5):
-    token_info_list = response['choices'][0]['logprobs']['content']
-
-    entropies = []
-    margins = []
-
-    for token_info in token_info_list:
-        top_logprobs = token_info.get("top_logprobs", [])
-        if not top_logprobs or len(top_logprobs) < 2:
-            continue
-
-        # Entropy calculation
-        probs = [math.exp(t['logprob']) for t in top_logprobs]
-        total_prob = sum(probs)
-        probs = [p / total_prob for p in probs if total_prob > 0]
-
-        entropy = -sum(p * math.log(p + 1e-10) for p in probs)
-        entropies.append(entropy)
-
-        # Logprob margin
-        margin = top_logprobs[0]['logprob'] - top_logprobs[1]['logprob']
-        margins.append(margin)
-
-    if not entropies or not margins:
-        return None
-
-    avg_entropy = sum(entropies) / len(entropies)
-    avg_margin = sum(margins) / len(margins)
-
-    # Invert entropy to get confidence-like score
-    entropy_conf = 1 / (1 + avg_entropy)
-
-    # Final merged confidence score
-    score = alpha * entropy_conf + beta * avg_margin
-
-    return {
-        "avg_entropy": avg_entropy,
-        "avg_margin": avg_margin,
-        "entropy_conf": entropy_conf,
-        "confidence_score": score
-    }
-
-
-def compute_confidence_score_simple(response, alpha=0.5, beta=0.5):
-    """
-    Computes a confidence score as a percentage using entropy and logprob margin,
-    without requiring predefined min/max values.
-    """
-    token_info_list = response['choices'][0]['logprobs']['content']
-    entropies = []
-    margins = []
-
-    for token_info in token_info_list:
-        top_logprobs = token_info.get("top_logprobs", [])
-        if not top_logprobs or len(top_logprobs) < 2:
-            continue
-
-        # --- Entropy ---
-        probs = [math.exp(t['logprob']) for t in top_logprobs]
-        total_prob = sum(probs)
-        if total_prob == 0:
-            continue
-        probs = [p / total_prob for p in probs]
-        entropy = -sum(p * math.log(p + 1e-10) for p in probs)
-        entropies.append(entropy)
-
-        # --- Margin ---
-        margin = top_logprobs[0]['logprob'] - top_logprobs[1]['logprob']
-        margins.append(margin)
-
-    if not entropies or not margins:
-        return None
-
-    avg_entropy = sum(entropies) / len(entropies)
-    avg_margin = sum(margins) / len(margins)
-
-    # Bounded [0, 1] components
-    entropy_conf = 1 / (1 + avg_entropy)
-    margin_conf = avg_margin / (1 + avg_margin)
-
-    # Weighted combined confidence (still [0, 1])
-    raw_score = alpha * entropy_conf + beta * margin_conf
-    percent_score = round(raw_score * 100, 2)
-
-    return {
-        "avg_entropy": avg_entropy,
-        "avg_margin": avg_margin,
-        "entropy_conf": entropy_conf,
-        "margin_conf": margin_conf,
-        "confidence_score": raw_score,
-        "confidence_percent": percent_score
-    }
-
-
-def compute_full_confidence_score(response,
-                                  alpha=0.3,   # entropy confidence weight
-                                  beta=0.3,    # margin confidence weight
-                                  gamma=0.2,   # top-1 prob weight
-                                  delta=0.1,   # length bonus weight
-                                  epsilon=0.1,  # repetition penalty weight
-                                  ideal_length=50):
-    """
-    Computes a full composite confidence score from an LLM response.
-    Returns both raw score and percentage [0-100].
-    """
-
-    token_info_list = response['choices'][0]['logprobs']['content']
-    if not token_info_list:
-        return None
-
-    entropies = []
-    margins = []
-    top1_probs = []
-    token_texts = []
-
-    for token_info in token_info_list:
-        top_logprobs = token_info.get("top_logprobs", [])
-        if not top_logprobs or len(top_logprobs) < 2:
-            continue
-
-        # Token text
-        token_texts.append(token_info.get('token', ''))
-
-        # Entropy
-        probs = [math.exp(t['logprob']) for t in top_logprobs]
-        total_prob = sum(probs)
-        if total_prob == 0:
-            continue
-        probs = [p / total_prob for p in probs]
-        entropy = -sum(p * math.log(p + 1e-10) for p in probs)
-        entropies.append(entropy)
-
-        # Logprob margin
-        margin = top_logprobs[0]['logprob'] - top_logprobs[1]['logprob']
-        margins.append(margin)
-
-        # Top1 prob
-        top1_probs.append(math.exp(top_logprobs[0]['logprob']))
-
-    if not entropies or not margins or not top1_probs:
-        return None
-
-    # --- Calculate individual components ---
-    avg_entropy = sum(entropies) / len(entropies)
-    entropy_conf = 1 / (1 + avg_entropy)
-
-    avg_margin = sum(margins) / len(margins)
-    margin_conf = avg_margin / (1 + avg_margin)
-
-    avg_top1_prob = sum(top1_probs) / len(top1_probs)
-
-    # Length bonus
-    length = len(token_texts)
-    length_score = min(1.0, length / ideal_length)
-
-    # Repetition penalty
-    token_counts = Counter(token_texts)
-    repeated = [t for t, c in token_counts.items() if c > 1]
-    rep_rate = sum(token_counts[t]
-                   for t in repeated) / length if length > 0 else 0
-    repetition_penalty = 1.0 - rep_rate
-
-    # --- Final weighted score ---
-    raw_score = (
-        alpha * entropy_conf +
-        beta * margin_conf +
-        gamma * avg_top1_prob +
-        delta * length_score +
-        epsilon * repetition_penalty
-    )
-
-    # Normalize to 0–100%
-    percent_score = round(raw_score * 100, 2)
-
-    return {
-        "avg_entropy": avg_entropy,
-        "entropy_conf": entropy_conf,
-        "avg_margin": avg_margin,
-        "margin_conf": margin_conf,
-        "avg_top1_prob": avg_top1_prob,
-        "length_score": length_score,
-        "repetition_penalty": repetition_penalty,
-        "confidence_score": raw_score,
-        "confidence_percent": percent_score
-    }
 
 
 def get_average_logprob_from_modelresponse(response):
@@ -259,9 +70,68 @@ def get_average_logprob_from_modelresponse(response):
     return sum(token_logprobs) / len(token_logprobs)
 
 
-# print(get_new_prompt("photosynthesis -> make easy"))
-avgOld = get_average_logprob_from_modelresponse(original_response)
-avgNew = get_average_logprob_from_modelresponse(rewritten_response)
+def optimize_prompt_confidence(original_prompt, max_attempts=3, weights=None):
+    if weights is None:
+        # Lower entropy = more confidence
+        weights = {"logprob": 1.0, "entropy": -0.5}
 
-print("OLD ", math.exp(avgOld))
-print("NEW ", math.exp(avgNew))
+    og_res = completion(
+        model="gpt-4o-mini",
+        temperature=0,
+        max_tokens=250,
+        messages=[{"role": "user", "content": original_prompt}],
+        logprobs=True,
+    )
+    og_avg = math.exp(
+        get_average_logprob_from_modelresponse(og_res))
+
+    best_prompt = original_prompt
+    best_score = og_avg
+
+    for attempt in range(max_attempts):
+        new_prompt = get_new_prompt(best_prompt)
+
+        # Generate response to new prompt
+        response = completion(
+            model="gpt-4o-mini",
+            temperature=0,
+            max_tokens=250,
+            messages=[{"role": "user", "content": new_prompt}],
+            logprobs=True,
+        )
+
+        avg_logprob = math.exp(
+            get_average_logprob_from_modelresponse(response))
+
+        print("PROB", avg_logprob, og_avg)
+
+        total_score = avg_logprob
+
+        print(
+            f"Attempt {attempt+1}: logprob={avg_logprob:.3f}")
+
+        if total_score > best_score:
+            best_score = total_score
+            best_prompt = new_prompt
+            return best_prompt, best_score
+
+    return best_prompt, best_score
+
+
+def autocomplete(prompt):
+    response = completion(
+        model="gpt-3.5-turbo",
+        messages=[
+            {"role": "user", "content": f"Autocomplete: {prompt}"}
+        ],
+        max_tokens=25,
+        temperature=0.7,
+        logprobs=True,  # Useful if you want top token probabilities
+        stream=False
+    )
+    return response.choices[0].message.content
+
+
+print(optimize_prompt_confidence(
+    """whats coppilot vscoce""", 3)
+)

@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Invisible Electron UI</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100vw;
+      height: 100vh;
+      background: transparent; /* Transparent background */
+      box-sizing: border-box;
+    }
+    body {
+      font-family: sans-serif;
+      color: white;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      height: 100vh;
+      background: transparent;
+    }
+    input {
+      width: 90%;
+      padding: 10px;
+      font-size: 16px;
+      border-radius: 8px;
+      border: none;
+      outline: none;
+      background: rgba(34, 34, 34, 0.85); /* Slightly visible input */
+      color: white;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <input id="search" placeholder="Type something..." autofocus />
+  <script>
+    const input = document.getElementById('search');
+    input.focus();
+
+    window.addEventListener('keydown', e => {
+      if (e.key === 'Escape') {
+        window.close();
+      }
+    });
+  </script>
+</body>
+</html>
