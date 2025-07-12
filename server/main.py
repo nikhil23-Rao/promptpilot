@@ -4,6 +4,7 @@ from litellm import completion
 import math
 from flask import Flask, request, jsonify
 
+
 app = Flask(__name__)
 
 
@@ -133,24 +134,3 @@ def autocomplete(prompt):
         stream=False
     )
     return response.choices[0].message.content
-
-
-@app.route("/optimize", methods=["POST"])
-def api_optimize():
-    data = request.get_json(force=True)
-    prompt = data.get("prompt", "")
-    max_attempts = int(data.get("max_attempts", 3))
-    best_prompt, best_score = optimize_prompt_confidence(prompt, max_attempts)
-    return jsonify({"optimized_prompt": best_prompt, "confidence": best_score})
-
-
-@app.route("/autocomplete", methods=["POST"])
-def api_autocomplete():
-    data = request.get_json(force=True)
-    prompt = data.get("prompt", "")
-    suggestion = autocomplete(prompt)
-    return jsonify({"autocomplete": suggestion})
-
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=1001)

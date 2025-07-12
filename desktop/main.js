@@ -10,10 +10,13 @@ const path = require("path");
 const { GlobalKeyboardListener } = require("node-global-key-listener");
 const clipboard = require("clipboardy");
 const { exec } = require("child_process");
+const axios = require("axios");
+const debounce = require("./utils/debounce");
 
 let tray = null;
 let mainWindow = null;
 let keyboardListener = null;
+let capturedText = "";
 
 process.on("unhandledRejection", (reason, promise) => {
   console.error("Unhandled Rejection at:", promise, "reason:", reason);
@@ -21,15 +24,14 @@ process.on("unhandledRejection", (reason, promise) => {
 
 function createWindow() {
   mainWindow = new BrowserWindow({
-    width: 600, // Match toolbar width
+    width: 600,
     height: 100,
-    show: true,
-    frame: false,
+    frame: false, // still frameless
+    transparent: true,
+    movable: true, // default = true, but set it explicitly
+    resizable: false,
     alwaysOnTop: true,
     skipTaskbar: true,
-    resizable: false,
-    transparent: true,
-    hasShadow: false,
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
@@ -42,7 +44,31 @@ function createWindow() {
   mainWindow.once("ready-to-show", () => {
     const { width } =
       require("electron").screen.getPrimaryDisplay().workAreaSize;
-    mainWindow.setPosition(Math.round((width - 600) / 2), 90);
+    mainWindow.setPosition(Math.round((width - 600) / 2), 100);
+  });
+}
+
+function createSquareWindow() {
+  newWindow = new BrowserWindow({
+    width: 400,
+    height: 500,
+    frame: false, // still frameless
+    transparent: true,
+    movable: true, // default = true, but set it explicitly
+    resizable: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false,
+    },
+  });
+
+  // Align window at the top center of the screen
+  newWindow.once("ready-to-show", () => {
+    const { width } =
+      require("electron").screen.getPrimaryDisplay().workAreaSize;
+    newWindow.setPosition(Math.round((width - 600) / 2), 400);
   });
 }
 
@@ -106,7 +132,9 @@ function getFrontmostApp() {
 }
 
 async function optimizePrompt() {
-  // 1. Simulate Cmd+C (copy)
+  mainWindow.webContents.executeJavaScript(`
+  document.getElementById("loader").style.display = "inline";
+`);
   exec(
     `osascript -e 'tell application "System Events" to keystroke "c" using {command down}'`
   );
@@ -119,19 +147,29 @@ async function optimizePrompt() {
   console.log("Original text:", text);
 
   // 4. Optimize the prompt (replace with your logic)
-  const optimized = text.toUpperCase(); // Example optimization
+  const optimized = await axios.post("http://127.0.0.1:1001/optimize", {
+    prompt: text,
+  });
 
   // 5. Write optimized prompt to clipboard
-  clipboard.writeSync(optimized);
+  clipboard.writeSync(optimized.data.optimized_prompt);
 
   // 6. Paste optimized prompt
   exec(
     `osascript -e 'tell application "System Events" to keystroke "v" using {command down}'`
   );
+  mainWindow.webContents.executeJavaScript(
+    `document.getElementById("loader").style.display = "none";`
+  );
 }
 
-function injectAutocompleteText() {
-  const suggestion = "This is your autocomplete suggestion"; // Customize this
+let suggestion = "";
+
+let lastUpdated = "";
+async function injectAutocompleteText() {
+  capturedText = "";
+  lastUpdated = "";
+  //   const suggestion = data.autocomplete; // Customize this
 
   // Step 1: Write to clipboard
   clipboard.writeSync(suggestion);
@@ -141,8 +179,43 @@ function injectAutocompleteText() {
     exec(
       `osascript -e 'tell application "System Events" to keystroke "v" using {command down}'`
     );
-  }, 300);
+  }, 100);
 }
+
+const fetchSuggestion = debounce(async () => {
+  mainWindow.webContents.executeJavaScript(`
+  document.getElementById("autocomplete").innerText = "...";
+`);
+
+  if (lastUpdated.trim() == capturedText.trim()) return;
+
+  lastUpdated = capturedText;
+
+  if (!capturedText.trim()) return;
+
+  try {
+    mainWindow.webContents.executeJavaScript(`
+  document.getElementById("loader").style.display = "inline";
+`);
+
+    const res = await axios.post("http://localhost:1001/autocomplete", {
+      prompt: capturedText,
+    });
+
+    console.log(res.data);
+
+    suggestion = res.data?.autocomplete || "";
+
+    mainWindow.webContents.executeJavaScript(`
+  document.getElementById("autocomplete").innerText = "${suggestion}";
+`);
+    mainWindow.webContents.executeJavaScript(`
+  document.getElementById("loader").style.display = "none";
+`);
+  } catch (e) {
+    console.error("Autocomplete failed:", e.message);
+  }
+}, 2000);
 
 app.whenReady().then(() => {
   const iconPath = path.join(__dirname, "doclogo.png");
@@ -153,6 +226,7 @@ app.whenReady().then(() => {
   }
 
   createWindow();
+  //   createSquareWindow();
 
   tray = new Tray(path.join(__dirname, "icon.png"));
   const contextMenu = Menu.buildFromTemplate([
@@ -172,56 +246,38 @@ app.whenReady().then(() => {
 
   // Optional: Log global keys
   keyboardListener = new GlobalKeyboardListener();
-  keyboardListener.addListener((e) => {
-    if (e.state === "DOWN") {
+  keyboardListener.addListener((e, down) => {
+    //     fetchSuggestion();
+
+    if (e.state !== "DOWN") return;
+
+    // 🚫 Ignore if Command key is held
+    if (down["LEFT META"] || down["RIGHT META"]) return;
+
+    if (e.name === "BACKSPACE") {
+      capturedText = capturedText.slice(0, -1);
+      console.log("Captured:", capturedText);
+      return;
+    }
+
+    if (e.name === "SPACE" || e.name === "Spacebar") {
+      capturedText += " ";
+      console.log("Captured:", capturedText);
+      return;
+    }
+
+    // Only accept printable single characters
+    if (e.name.length === 1 && /^[\x20-\x7E]$/.test(e.name)) {
+      capturedText += e.name.toLowerCase();
+      console.log("Captured:", capturedText);
     }
   });
-  let capturedText = "";
-  let shiftDown = false;
-  let capsLockOn = false;
 
   // Map of shift-modified symbols
 
-  keyboardListener.addListener((e) => {
-    const key = e.name;
-    const state = e.state;
-
-    // Track shift state
-    if (key === "Left Shift" || key === "Right Shift") {
-      shiftDown = state === "DOWN";
-      return;
-    }
-
-    // Track Caps Lock toggle
-    if (key === "Caps Lock" && state === "DOWN") {
-      capsLockOn = !capsLockOn;
-      return;
-    }
-
-    if (state !== "DOWN") return;
-
-    if (key === " " || key === "SPACE" || key === "Spacebar") {
-      capturedText += " ";
-    }
-    if (key === "BACKSPACE" || key === "Delete") {
-      capturedText = capturedText.slice(0, -1);
-    }
-
-    // Ignore control/meta keys (Tab, Enter, Arrows, etc.)
-    if (key.length !== 1 || !/^[\x20-\x7E]$/.test(key)) return;
-
-    // Handle letters (respect Shift and Caps Lock)
-    if (/[a-zA-Z]/.test(key)) {
-      const isUpper = (shiftDown && !capsLockOn) || (!shiftDown && capsLockOn);
-      capturedText += isUpper ? key.toUpperCase() : key.toLowerCase();
-      console.log("Captured Text:", capturedText);
-      return;
-    }
-
-    // Handle numbers/symbols with shift
-
-    console.log("Captured Text:", capturedText);
-  });
+  mainWindow.webContents.executeJavaScript(`
+  document.getElementById("loader").style.display = "none";
+`);
 });
 
 app.on("will-quit", () => {

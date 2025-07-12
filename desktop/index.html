@@ -9,6 +9,7 @@
       width: 100vw;
       height: 100vh;
       background: transparent;
+          -webkit-app-region: drag; 
       box-sizing: border-box;
     }
     body {
@@ -22,6 +23,10 @@
       justify-content: center;
       padding-bottom: 8px; /* Increased from 32px to 48px to move toolbar down */
     }
+    @keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
     .toolbar {
       width: 600px;
       height: 56px;
@@ -85,6 +90,10 @@
       border-radius: 6px;
       padding: 2px 8px;
     }
+   
+    #loader:hover {
+      background-color: transparent;
+    }
     .toolbar-circular-btn {
       width: 38px;
       height: 38px;
@@ -125,14 +134,18 @@
     <div class="toolbar-section" style="gap:16px;">
       <ul style="list-style:none; margin:0; padding:0; display:flex; gap:16px;">
         <p style="color: #e0e6f8;">promptpilot</p>
-        <li style="background:rgba(80,80,120,0.18); color:#e0e6f8; border-radius:16px; padding:4px 10px; font-size:15px; box-shadow:0 1px 6px rgba(0,0,0,0.10); border:1px solid rgba(255,255,255,0.10);">
-        turn on autocomplete
+        <li   id="autocomplete" style="background:rgba(80,80,120,0.18); background-color: goldenrod; color:#e0e6f8; border-radius:16px; padding:4px 10px; font-size:15px; box-shadow:0 1px 6px rgba(0,0,0,0.10); border:1px solid rgba(255,255,255,0.10);">
+        missing context
         </li>
       </ul>
     </div>
     <div class="toolbar-section">
+       <button class="toolbar-circular-btn" title="loading" id="loader">
+        <span id="loader" class="material-icons" style="animation: spin 1s linear infinite; color:lightcoral;">autorenew</span>
+      </button>
       <button class="toolbar-circular-btn" title="Help">
         <span class="material-icons">help_outline</span>
+        
       </button>
       <button class="toolbar-circular-btn" title="More">
         <span class="material-icons">more_vert</span>
