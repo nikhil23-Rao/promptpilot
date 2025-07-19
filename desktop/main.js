@@ -132,6 +132,7 @@ function getFrontmostApp() {
 }
 
 async function optimizePrompt() {
+  mainWindow.showInactive();
   mainWindow.webContents.executeJavaScript(`
   document.getElementById("loader").style.display = "inline";
 `);
@@ -161,6 +162,7 @@ async function optimizePrompt() {
   mainWindow.webContents.executeJavaScript(
     `document.getElementById("loader").style.display = "none";`
   );
+  mainWindow.hide();
 }
 
 let suggestion = "";
@@ -243,6 +245,7 @@ app.whenReady().then(() => {
   globalShortcut.register("Command+Shift+Space", toggleWindow);
   globalShortcut.register("Command+Shift+I", injectAutocompleteText);
   globalShortcut.register("Command+Y", optimizePrompt);
+  mainWindow.hide();
 
   // Optional: Log global keys
   keyboardListener = new GlobalKeyboardListener();
