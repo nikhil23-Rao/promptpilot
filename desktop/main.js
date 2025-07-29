@@ -22,6 +22,69 @@ process.on("unhandledRejection", (reason, promise) => {
   console.error("Unhandled Rejection at:", promise, "reason:", reason);
 });
 
+const abbreviationMap = {
+  bp: "bullet points",
+  ty: "Thank you",
+  // Prompting templates
+  ip: "I want you to play the role of an expert in",
+  ct: "Can you think step-by-step and explain your reasoning?",
+  rp: "Respond ONLY in JSON format with the following structure:",
+  ept: "Explain your previous thought in simpler terms.",
+  vbp: "What are the various possible biases in this prompt?",
+  imp: "Improve this prompt for clarity, specificity, and context.",
+  alt: "Give me 3 alternative prompts for the same goal.",
+  ctp: "Critique the prompt and suggest optimizations.",
+  wip: "What information is missing from the prompt?",
+  rpg: "Respond as if you're a character in a game, stay in persona.",
+
+  // Output evaluation
+  bq: "What are the biggest questions that remain unanswered?",
+  cal: "On a scale of 1 to 10, how confident are you in this answer?",
+  eval: "Evaluate the correctness and completeness of your output.",
+  mis: "What did you misunderstand or possibly get wrong?",
+  ece: "Calculate the Expected Calibration Error (ECE) for this output.",
+  conf: "At what confidence level would this prediction be most reliable?",
+
+  // Formatting helpers
+  code: "Wrap your response in triple backticks and specify the language.",
+  ls: "List the steps or components involved:",
+  pts: "Point out the assumptions you're making in your answer.",
+  ex: "Give an example to clarify.",
+  cmp: "Compare the following two models or approaches:",
+  note: "Note:",
+  warn: "Warning:",
+  tip: "Tip:",
+
+  // Debugging LLM behavior
+  fail: "Why might this prompt have failed?",
+  fix: "Fix the issues with the previous prompt.",
+  halluc: "Is there any sign of hallucination in this response?",
+  trace: "Trace the logic step by step.",
+  log: "Log your internal thoughts before responding.",
+
+  // Misc
+  sum: "Summarize your response in 1-2 sentences.",
+  det: "Expand your answer with more technical detail.",
+};
+
+function expandAbbreviation(abbrev) {
+  console.log(`Expanding abbreviation: ${abbrev}`);
+
+  // Step 1: Backspace the abbreviation
+  for (let i = 0; i < abbrev.length; i++) {
+    exec(`osascript -e 'tell application "System Events" to key code 51'`); // 51 = backspace
+  }
+
+  // Step 2: Paste expansion
+  const text = abbreviationMap[abbrev];
+  setTimeout(() => {
+    clipboard.writeSync(text);
+    exec(
+      `osascript -e 'tell application "System Events" to keystroke "v" using {command down}'`
+    );
+  }, 100); // slight delay for backspace to register
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 600,
@@ -248,31 +311,44 @@ app.whenReady().then(() => {
   mainWindow.hide();
 
   // Optional: Log global keys
-  keyboardListener = new GlobalKeyboardListener();
-  keyboardListener.addListener((e, down) => {
-    //     fetchSuggestion();
 
+  keyboardListener = new GlobalKeyboardListener();
+  let keyBuffer = [];
+  const maxAbbrevLength = Math.max(
+    ...Object.keys(abbreviationMap).map((k) => k.length)
+  );
+
+  keyboardListener.addListener((e, down) => {
     if (e.state !== "DOWN") return;
 
-    // 🚫 Ignore if Command key is held
+    // Ignore modifier keys
     if (down["LEFT META"] || down["RIGHT META"]) return;
 
     if (e.name === "BACKSPACE") {
-      capturedText = capturedText.slice(0, -1);
-      console.log("Captured:", capturedText);
+      keyBuffer.pop();
       return;
     }
 
-    if (e.name === "SPACE" || e.name === "Spacebar") {
-      capturedText += " ";
-      console.log("Captured:", capturedText);
+    if (e.name === "SPACE" || e.name === "RETURN") {
+      keyBuffer = []; // reset buffer on space or enter
       return;
     }
 
     // Only accept printable single characters
     if (e.name.length === 1 && /^[\x20-\x7E]$/.test(e.name)) {
-      capturedText += e.name.toLowerCase();
-      console.log("Captured:", capturedText);
+      keyBuffer.push(e.name.toLowerCase());
+
+      // Trim buffer to max abbreviation size
+      if (keyBuffer.length > maxAbbrevLength) {
+        keyBuffer.shift();
+      }
+
+      // Join last n characters and match
+      const joined = keyBuffer.join("");
+      if (abbreviationMap[joined]) {
+        expandAbbreviation(joined);
+        keyBuffer = []; // reset after expansion
+      }
     }
   });
 
