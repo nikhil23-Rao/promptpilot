@@ -1,0 +1,98 @@
+[
+  {
+    "original_prompt": "help w frankenstein fishbowl ap lit give evidence",
+    "optimized_prompt": "...",
+    "original_scores": {
+      "entropy": 0.14174740332780203,
+      "semantic_similarity": 0.9295436797854328,
+      "self_score": 0.8,
+      "confidence": 0.7513181846707714
+    },
+    "optimized_scores": {
+      "entropy": 0.13601479145779638,
+      "semantic_similarity": 0.9546922354297117,
+      "self_score": 0.9,
+      "confidence": 0.7635250341777822
+    }
+  },
+  {
+    "original_prompt": "code css wave hero page react",
+    "optimized_prompt": "...",
+    "original_scores": {
+      "entropy": 0.057695856914194536,
+      "semantic_similarity": 0.9441891011308287,
+      "self_score": 0.8,
+      "confidence": 0.9034024425381243
+    },
+    "optimized_scores": {
+      "entropy": 0.05738760735287719,
+      "semantic_similarity": 0.9684835236463625,
+      "self_score": 0.8,
+      "confidence": 0.8894545578951558
+    }
+  },
+  {
+    "original_prompt": "help w frankenstein fishbowl ap lit give evidence",
+    "optimized_prompt": "...",
+    "original_scores": {
+      "entropy": 0.13510038257167079,
+      "semantic_similarity": 0.9320796348527973,
+      "self_score": 0.9,
+      "confidence": 0.765612620809328
+    },
+    "optimized_scores": {
+      "entropy": 0.1465911160344005,
+      "semantic_similarity": 0.9551508955960996,
+      "self_score": 0.9,
+      "confidence": 0.7390835600996126
+    }
+  },
+  {
+    "original_prompt": "help w frankenstein fishbowl ap lit give evidence",
+    "optimized_prompt": "...",
+    "original_scores": {
+      "entropy": 0.13847548337710372,
+      "semantic_similarity": 0.9351345083144091,
+      "self_score": 0.8,
+      "confidence": 0.7446633361760832
+    },
+    "optimized_scores": {
+      "entropy": 0.13867898969664536,
+      "semantic_similarity": 0.9506768928252687,
+      "self_score": 0.9,
+      "confidence": 0.7593062495467122
+    }
+  },
+  {
+    "original_prompt": "help w frankenstein fishbowl ap lit give evidence",
+    "optimized_prompt": "...",
+    "original_scores": {
+      "entropy": 0.1300976877427712,
+      "semantic_similarity": 0.9283855690938763,
+      "self_score": 0.8,
+      "confidence": 0.7719137780724329
+    },
+    "optimized_scores": {
+      "entropy": 0.13779932475989434,
+      "semantic_similarity": 0.9536923849792023,
+      "self_score": 0.9,
+      "confidence": 0.7520128847215702
+    }
+  },
+  {
+    "original_prompt": "help w frankenstein fishbowl ap lit give evidence",
+    "optimized_prompt": "...",
+    "original_scores": {
+      "entropy": 0.12625771931938742,
+      "semantic_similarity": 0.9347469324620725,
+      "self_score": 0.8,
+      "confidence": 0.7665730871188918
+    },
+    "optimized_scores": {
+      "entropy": 0.12440809932571949,
+      "semantic_similarity": 0.9559295625937616,
+      "self_score": 0.8,
+      "confidence": 0.782078861598818
+    }
+  }
+]
