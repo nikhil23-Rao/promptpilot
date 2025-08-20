@@ -1,17 +1,20 @@
 <!DOCTYPE html>
 <html>
+
 <head>
   <title>Invisible Electron UI</title>
   <style>
-    html, body {
+    html,
+    body {
       margin: 0;
       padding: 0;
       width: 100vw;
       height: 100vh;
       background: transparent;
-          -webkit-app-region: drag; 
+      -webkit-app-region: drag;
       box-sizing: border-box;
     }
+
     body {
       font-family: sans-serif;
       color: white;
@@ -21,27 +24,39 @@
       display: flex;
       align-items: flex-end;
       justify-content: center;
-      padding-bottom: 8px; /* Increased from 32px to 48px to move toolbar down */
+      padding-bottom: 8px;
+      /* Increased from 32px to 48px to move toolbar down */
     }
+
     @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
+      0% {
+        transform: rotate(0deg);
+      }
+
+      100% {
+        transform: rotate(360deg);
+      }
+    }
+
     .toolbar {
       width: 600px;
       height: 56px;
-      background: rgba(34, 34, 34, 0.45); /* More transparent for glass effect */
+      background: rgba(34, 34, 34, 0.45);
+      /* More transparent for glass effect */
       border-radius: 28px;
-      box-shadow: 0 2px 16px rgba(0,0,0,0.25);
+      box-shadow: 0 2px 16px rgba(0, 0, 0, 0.25);
       display: flex;
       align-items: center;
       justify-content: space-between;
       padding: 0 24px;
       gap: 16px;
-      backdrop-filter: blur(16px) saturate(160%); /* Glassmorphism effect */
+      backdrop-filter: blur(16px) saturate(160%);
+      /* Glassmorphism effect */
       -webkit-backdrop-filter: blur(16px) saturate(160%);
-      border: 1px solid rgba(255,255,255,0.12); /* Subtle border for glass look */
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      /* Subtle border for glass look */
     }
+
     .toolbar-section {
       display: flex;
       align-items: center;
@@ -50,6 +65,7 @@
       border-radius: 12px;
       padding: 2px 8px;
     }
+
     .toolbar-section p {
       /* Removed glassy background, border, filter, and shadow */
       background: none;
@@ -59,6 +75,7 @@
       color: #e0e6f8;
       font-weight: 500;
     }
+
     .toolbar-btn {
       background: none;
       border: none;
@@ -73,10 +90,12 @@
       transition: background 0.15s, color 0.15s;
       /* Removed glassy background, border, filter, and shadow */
     }
+
     .toolbar-btn:hover {
       background: rgba(80, 80, 120, 0.22);
       color: #fff;
     }
+
     .toolbar-timer {
       font-size: 17px;
       color: #e0e6f8;
@@ -90,10 +109,11 @@
       border-radius: 6px;
       padding: 2px 8px;
     }
-   
+
     #loader:hover {
       background-color: transparent;
     }
+
     .toolbar-circular-btn {
       width: 38px;
       height: 38px;
@@ -110,10 +130,12 @@
       font-size: 20px;
       /* Removed glassy background, border, filter, and shadow */
     }
+
     .toolbar-circular-btn:hover {
       background: #1976d2cc;
       color: #fff;
     }
+
     input {
       width: 90%;
       padding: 10px;
@@ -121,31 +143,35 @@
       border-radius: 8px;
       border: none;
       outline: none;
-      background: rgba(34, 34, 34, 0.85); /* Slightly visible input */
+      background: rgba(34, 34, 34, 0.85);
+      /* Slightly visible input */
       color: white;
-      box-shadow: 0 2px 12px rgba(0,0,0,0.15);
+      box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
       margin-top: 10px;
     }
   </style>
   <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
 </head>
+
 <body>
   <div class="toolbar">
     <div class="toolbar-section" style="gap:16px;">
       <ul style="list-style:none; margin:0; padding:0; display:flex; gap:16px;">
         <p style="color: #e0e6f8;">promptpilot</p>
-        <li   id="autocomplete" style="background:rgba(80,80,120,0.18); background-color: lightcoral; color:#e0e6f8; border-radius:16px; padding:4px 10px; font-size:15px; box-shadow:0 1px 6px rgba(0,0,0,0.10); border:1px solid rgba(255,255,255,0.10);">
-        optimizing prompt...
+        <li id="autocomplete"
+          style="background:rgba(80,80,120,0.18); background-color: lightcoral; color:#e0e6f8; border-radius:16px; padding:4px 10px; font-size:15px; box-shadow:0 1px 6px rgba(0,0,0,0.10); border:1px solid rgba(255,255,255,0.10);">
+          optimizing prompt...
         </li>
       </ul>
     </div>
     <div class="toolbar-section">
-       <button class="toolbar-circular-btn" title="loading" id="loader">
-        <span id="loader" class="material-icons" style="animation: spin 1s linear infinite; color:lightcoral;">autorenew</span>
+      <button class="toolbar-circular-btn" title="loading" id="loader">
+        <span id="loader" class="material-icons"
+          style="animation: spin 1s linear infinite; color:lightcoral;">autorenew</span>
       </button>
       <button class="toolbar-circular-btn" title="Help">
         <span class="material-icons">help_outline</span>
-        
+
       </button>
       <button class="toolbar-circular-btn" title="More">
         <span class="material-icons">more_vert</span>
@@ -163,4 +189,5 @@
     });
   </script>
 </body>
+
 </html>

@@ -216,6 +216,9 @@ async function optimizePrompt() {
   });
 
   // 5. Write optimized prompt to clipboard
+  console.log("DATA");
+  console.log(optimized.data.score);
+  console.log(optimized.data.metrics);
   clipboard.writeSync(optimized.data.optimized_prompt);
 
   // 6. Paste optimized prompt

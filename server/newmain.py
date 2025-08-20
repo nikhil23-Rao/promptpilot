@@ -8,6 +8,9 @@ from flask import Flask, request, jsonify
 from typing import List
 from itertools import combinations
 import litellm
+import pandas as pd
+import csv
+import time
 
 # === KL Divergence ===
 
@@ -479,8 +482,183 @@ def optimize_prompt_with_kl_stability(original_prompt, max_attempts=3):
     return best_prompt, best_score, best_metrics
 
 
-optimized_prompt, score, metrics = optimize_prompt_with_kl_stability(
-    "code css wave hero page react", max_attempts=5)
-print(f"Optimized prompt:\n{optimized_prompt}\nScore: {score:.4f}")
-print(score)
-print(metrics)
+@app.route("/optimize", methods=["POST"])
+def api_optimize_with_kl_stability():
+    data = request.get_json(force=True)
+    original_prompt = data.get("prompt", "")
+    max_attempts = int(data.get("max_attempts", 3))
+
+    if not original_prompt:
+        return jsonify({"error": "Prompt is required"}), 400
+
+    optimized_prompt, score, metrics = optimize_prompt_with_kl_stability(
+        original_prompt, max_attempts=max_attempts
+    )
+
+    return jsonify({
+        "optimized_prompt": optimized_prompt,
+        "score": score,
+        "metrics": metrics
+    })
+
+
+def process_prompts_from_csv(input_csv_path, output_csv_path, max_attempts=3):
+    # Read prompts from CSV
+    raw_prompts = [
+        # 50 Poorly Written / Regular Prompts
+        "what's a cell",
+        "Help me with my science project on volcanoes",
+        "explain gravity in simple way",
+        "dogs?",
+        "make me a poem",
+        "summarize the book",
+        "how work democracy",
+        "i need code",
+        "why the sky is blue",
+        "Tell me more about love",
+        "what's time",
+        "Give three facts",
+        "explain history stuff",
+        "write better",
+        "i need help resume",
+        "Python help?",
+        "better version of this",
+        "what to cook",
+        "show me how to write",
+        "Who is responsible?",
+        "explain AI",
+        "what’s a good movie",
+        "list planets",
+        "help me write a story about dragons and castles",
+        "fix my essay",
+        "what is war",
+        "Give 5 tips for student",
+        "why do people learn",
+        "good ideas for app?",
+        "explain better please",
+        "make table",
+        "hamlet quote",
+        "whats good life",
+        "tell joke about cats",
+        "write me job desc",
+        "how do planes work",
+        "math hard help",
+        "I need to understand cells for school",
+        "find problem in this code",
+        "describe art",
+        "how to make a plan",
+        "define freedom",
+        "talk about climate change stuff",
+        "i have a question",
+        "give me advice for school",
+        "what is happening here",
+        "analyze this poem",
+        "make me something cool",
+        "explain book ending",
+        "what is the answer",
+
+        # 50 Regular, Natural Prompts
+        "Can you summarize the main themes in George Orwell's *1984*?",
+        "What are the pros and cons of nuclear energy?",
+        "Explain how the stock market works to a high school student.",
+        "Write a Python function to reverse a string.",
+        "How do black holes form in space?",
+        "Help me come up with a creative story idea for a sci-fi short story.",
+        "What are the key differences between capitalism and socialism?",
+        "How can I improve my SAT reading score?",
+        "Give me a weekly workout routine for building muscle.",
+        "What’s the difference between machine learning and AI?",
+        "Can you help me brainstorm startup ideas in the education space?",
+        "Write a cover letter for a data analyst role.",
+        "Explain the concept of supply and demand with examples.",
+        "Summarize the plot of *To Kill a Mockingbird* in under 200 words.",
+        "What are some effective time management techniques for students?",
+        "Compare and contrast the French and American Revolutions.",
+        "Generate a list of 10 healthy dinner recipes I can cook in 30 minutes.",
+        "What are the causes and effects of climate change?",
+        "How does photosynthesis work, and why is it important?",
+        "Give me 5 tips for improving public speaking skills.",
+        "Explain the difference between an LLC and a sole proprietorship.",
+        "What should I include in my college application essay?",
+        "Can you simulate a conversation between a doctor and patient about anxiety?",
+        "Create a daily routine schedule for someone trying to be more productive.",
+        "What are the most important features in a modern smartphone?",
+        "Write a poem inspired by a rainy day in a city.",
+        "Explain the significance of the Civil Rights Movement in the US.",
+        "Give me feedback on this paragraph I wrote about climate change.",
+        "Help me understand recursion with a real-world analogy.",
+        "List 10 commonly used logical fallacies in arguments.",
+        "What’s the best way to prepare for a job interview in tech?",
+        "Write a short horror story that takes place in a library.",
+        "Can you help me write a business pitch for a tutoring app?",
+        "What are the psychological effects of social media on teenagers?",
+        "Explain the key points of the First Amendment.",
+        "Generate a list of engaging YouTube video ideas for a tech channel.",
+        "What are some good icebreakers for high school group activities?",
+        "Convert this paragraph into professional business writing.",
+        "What’s the plot twist in the novel *Frankenstein*?",
+        "Help me understand quantum entanglement like I’m 12.",
+        "Create a pros and cons list for moving to a new city.",
+        "Suggest 5 books for someone interested in philosophy.",
+        "Explain the basic rules of American football to a beginner.",
+        "How do I create a personal website from scratch?",
+        "What are some healthy coping mechanisms for stress?",
+        "Help me generate interview questions for a podcast about startups.",
+        "Give me a breakdown of the characters in *Pride and Prejudice*.",
+        "What makes a good opening line in a novel?",
+        "Write an email to a professor asking for a letter of recommendation."
+    ]
+
+    # Store results
+    results = []
+
+    for i, row in enumerate(raw_prompts):
+        time.sleep(1)
+        original_prompt = row
+        print(f"\nProcessing Prompt {i+1}: {original_prompt[:60]}...")
+
+        try:
+            optimized_prompt, score, metrics = optimize_prompt_with_kl_stability(
+                original_prompt, max_attempts=max_attempts
+            )
+
+            result = {
+                "original_prompt": original_prompt,
+                "optimized_prompt": optimized_prompt,
+                "final_score": score,
+                "confidence": metrics.get("confidence", 0),
+                "entropy": metrics.get("entropy", 0),
+                "semantic_similarity": metrics.get("semantic_similarity", 0),
+                "self_score": metrics.get("self_score", 0),
+            }
+
+        except Exception as e:
+            print(f"Error processing prompt {i+1}: {e}")
+            result = {
+                "original_prompt": original_prompt,
+                "optimized_prompt": "",
+                "final_score": 0,
+                "confidence": 0,
+                "entropy": 0,
+                "semantic_similarity": 0,
+                "self_score": 0,
+                "error": str(e)
+            }
+
+        results.append(result)
+
+    # Save to output CSV
+    keys = results[0].keys()
+    with open(output_csv_path, "w", newline='', encoding='utf-8') as f:
+        writer = csv.DictWriter(f, fieldnames=keys)
+        writer.writeheader()
+        writer.writerows(results)
+
+    print(f"\n✅ Finished processing. Results saved to {output_csv_path}")
+
+
+# process_prompts_from_csv("tests/prompts.csv", "output.csv")
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=1001)

@@ -3,6 +3,14 @@ import json
 import numpy as np
 from scipy.stats import entropy, ttest_rel
 from litellm import completion, embedding
+import pandas as pd
+import time
+
+
+def load_prompt_pairs_from_csv():
+    df = pd.read_csv("output.csv")
+    prompt_pairs = list(zip(df["original_prompt"], df["optimized_prompt"]))
+    return prompt_pairs
 
 
 def get_embedding(text):
@@ -107,6 +115,7 @@ def run_ab_test(prompt_pairs):
     for idx, (original_prompt, optimized_prompt) in enumerate(prompt_pairs):
         print(f"Testing prompt pair {idx+1}/{len(prompt_pairs)}")
 
+        time.sleep(1)
         original_scores = score_prompt(original_prompt)
         optimized_scores = score_prompt(optimized_prompt)
 
@@ -131,89 +140,101 @@ def compute_response_confidence(logprobs):
     return math.exp(avg_logprob)  # maps to (0, 1]
 
 
-def analyze_results(results):
-    entropy_diffs = []
-    semantic_diffs = []
-    self_score_diffs = []
-    conf_diffs = []
+def analyze_results(data):
+    original_entropy = [d["original_scores"]["entropy"] for d in data]
+    optimized_entropy = [d["optimized_scores"]["entropy"] for d in data]
 
-    for r in results:
-        oe = r['original_scores']['entropy']
-        osim = r['original_scores']['semantic_similarity']
-        oscore = r['original_scores']['self_score']
-        oc = r['original_scores']['confidence']
+    original_similarity = [d["original_scores"]
+                           ["semantic_similarity"] for d in data]
+    optimized_similarity = [d["optimized_scores"]
+                            ["semantic_similarity"] for d in data]
 
-        pe = r['optimized_scores']['entropy']
-        psim = r['optimized_scores']['semantic_similarity']
-        pscore = r['optimized_scores']['self_score']
-        pc = r['optimized_scores']['confidence']
+    original_self_score = [d["original_scores"]["self_score"] for d in data]
+    optimized_self_score = [d["optimized_scores"]["self_score"] for d in data]
 
-        # Replace None or invalid values with NaN
-        values = [oe, osim, oscore, oc, pe, psim, pscore, pc]
-        values = [float('nan') if v is None else v for v in values]
+    original_confidence = [d["original_scores"]["confidence"] for d in data]
+    optimized_confidence = [d["optimized_scores"]["confidence"] for d in data]
 
-        if not any(map(math.isnan, values)):
-            # Lower entropy is better
-            entropy_diffs.append(oe - pe)
-            # Higher similarity is better
-            semantic_diffs.append(psim - osim)
-            # Higher self-score is better
-            self_score_diffs.append(pscore - oscore)
-            # Higher confidence is better
-            conf_diffs.append(pc - oc)
-        else:
-            print(
-                f"Skipping due to NaN in scores: {r['original_prompt'][:60]}...")
+    print("📊 One-sided Paired t-tests (direction-aware):")
 
-    if len(entropy_diffs) == 0:
-        print("No valid data to analyze.")
-        return {}
+    def one_sided_ttest(orig, opt, direction="increase", name="Metric"):
+        stat, p = ttest_rel(opt, orig)
+        p_one_sided = p / 2 if (stat > 0 and direction == "increase") or (
+            stat < 0 and direction == "decrease") else 1.0
+        mean_diff = np.mean(np.array(opt) - np.array(orig))
+        better = (mean_diff > 0 and direction == "increase") or (
+            mean_diff < 0 and direction == "decrease")
+        arrow = "↑" if direction == "increase" else "↓"
+        print(f"• {name} ({arrow} better): p = {p_one_sided:.5g} | Mean Δ = {mean_diff:.5f} | {'✅' if p_one_sided < 0.05 and better else '❌'}")
 
-    print("\n🔍 Paired t-tests (optimized vs original):")
-    print("• Entropy (↓ better):          p =", ttest_rel(
-        entropy_diffs, np.zeros(len(entropy_diffs))).pvalue)
-    print("• Semantic similarity (↑):     p =", ttest_rel(
-        semantic_diffs, np.zeros(len(semantic_diffs))).pvalue)
-    print("• LLM self-score (↑):          p =",
-          ttest_rel(self_score_diffs, np.zeros(len(self_score_diffs))).pvalue)
-    print("• Confidence (↑):              p =", ttest_rel(
-        conf_diffs, np.zeros(len(conf_diffs))).pvalue)
+    one_sided_ttest(original_entropy, optimized_entropy,
+                    direction="decrease", name="Entropy")
+    one_sided_ttest(original_similarity, optimized_similarity,
+                    direction="increase", name="Semantic similarity")
+    one_sided_ttest(original_self_score, optimized_self_score,
+                    direction="increase", name="LLM self-score")
+    one_sided_ttest(original_confidence, optimized_confidence,
+                    direction="increase", name="Confidence")
 
-    win_rate = sum(
-        (ed > 0 and sd > 0 and sc > 0 and cd > 0)
-        for ed, sd, sc, cd in zip(entropy_diffs, semantic_diffs, self_score_diffs, conf_diffs)
-    ) / len(entropy_diffs)
 
-    print(f"\n🏆 Win rate (all 4 metrics improved): {win_rate*100:.1f}%")
+def statistical_proof_of_improvement(results):
+    """
+    Takes a list of dictionaries, each with original and optimized prompt scores:
+    [
+        {
+            "original_scores": {"entropy": ..., "semantic_similarity": ..., "confidence": ..., "self_score": ...},
+            "optimized_scores": {"entropy": ..., "semantic_similarity": ..., "confidence": ..., "self_score": ...}
+        },
+        ...
+    ]
+    """
 
-    return {
-        "entropy_diffs": entropy_diffs,
-        "semantic_diffs": semantic_diffs,
-        "self_score_diffs": self_score_diffs,
-        "confidence_diffs": conf_diffs,
-        "win_rate": win_rate,
+    metrics = {
+        "entropy": "decrease",
+        "semantic_similarity": "increase",
+        "confidence": "increase",
+        "self_score": "increase"
     }
 
+    print("📊 Statistical Evidence for Optimized Prompt Improvement\n")
 
-# Example prompt pairs: (original, optimized)
+    for metric, direction in metrics.items():
+        orig_vals = np.array([r["original_scores"][metric] for r in results])
+        opt_vals = np.array([r["optimized_scores"][metric] for r in results])
+
+        # Paired t-test
+        t_stat, p_val = ttest_rel(opt_vals, orig_vals)
+        diff = opt_vals - orig_vals
+        mean_diff = np.mean(diff)
+
+        # One-sided p-value (directional test)
+        if direction == "increase":
+            p_one_sided = p_val / 2 if t_stat > 0 else 1.0
+            improved = mean_diff > 0
+        else:  # direction == "decrease"
+            p_one_sided = p_val / 2 if t_stat < 0 else 1.0
+            improved = mean_diff < 0
+
+        # Output results
+        symbol = "↑" if direction == "increase" else "↓"
+        significant = p_one_sided < 0.05 and improved
+        print(f"• {metric.title()} ({symbol} better):")
+        print(f"   Mean Δ = {mean_diff:.4f}")
+        print(
+            f"   One-sided p = {p_one_sided:.5g} {'✅ Significant' if significant else '❌ Not significant'}\n")
+
+
+# # Example prompt pairs: (original, optimized)
 prompt_pairs = [
     ("help w frankenstein fishbowl ap lit give evidence",
      """You are tasked with facilitating a discussion in a fishbowl format for an Advanced Placement Literature class, focusing on the book "Frankenstein" by Mary Shelley. Your objective is to identify and present key pieces of evidence from the text that can be used to support various themes, character analyses, or plot developments during the discussion. Ensure that the evidence you select is relevant and can provoke thoughtful dialogue among participants. Consider significant quotes, character actions, and pivotal moments in the narrative that illustrate the central ideas of the book. When presenting your evidence, structure it clearly, providing context for each piece and explaining its significance to the overall themes of "Frankenstein." Aim to engage your peers in meaningful conversation by encouraging them to respond to the evidence you present."""),
-    ("code css wave hero page react",
-        "Your task is to create a CSS wave effect for a hero section in a React application. Begin by designing a visually appealing wave pattern that can serve as a background for the hero page. Ensure that the wave is responsive and adapts well to different screen sizes. Utilize CSS animations to enhance the visual dynamics of the wave, making it engaging for users. When implementing this in React, consider using styled-components or CSS modules for better organization and maintainability of your styles. Be cautious of browser compatibility issues and test the wave effect across various browsers to ensure consistent performance. The final output should be a clean and organized code snippet that can be easily integrated into a React component, along with any necessary comments to explain the functionality of the code.", ),
-    ("help w frankenstein fishbowl ap lit give evidence",
-     """You are tasked with facilitating a discussion in a fishbowl format for an Advanced Placement Literature class, focusing on the book "Frankenstein" by Mary Shelley. Your objective is to identify and present key pieces of evidence from the text that can be used to support various themes, character analyses, or plot developments during the discussion. Ensure that the evidence you select is relevant and can provoke thoughtful dialogue among participants. Consider significant quotes, character actions, and pivotal moments in the narrative that illustrate the central ideas of the book. When presenting your evidence, structure it clearly, providing context for each piece and explaining its significance to the overall themes of "Frankenstein." Aim to engage your peers in meaningful conversation by encouraging them to respond to the evidence you present."""),
-    ("help w frankenstein fishbowl ap lit give evidence",
-     """You are tasked with facilitating a discussion in a fishbowl format for an Advanced Placement Literature class, focusing on the book "Frankenstein" by Mary Shelley. Your objective is to identify and present key pieces of evidence from the text that can be used to support various themes, character analyses, or plot developments during the discussion. Ensure that the evidence you select is relevant and can provoke thoughtful dialogue among participants. Consider significant quotes, character actions, and pivotal moments in the narrative that illustrate the central ideas of the book. When presenting your evidence, structure it clearly, providing context for each piece and explaining its significance to the overall themes of "Frankenstein." Aim to engage your peers in meaningful conversation by encouraging them to respond to the evidence you present."""),
-    ("help w frankenstein fishbowl ap lit give evidence",
-     """You are tasked with facilitating a discussion in a fishbowl format for an Advanced Placement Literature class, focusing on the book "Frankenstein" by Mary Shelley. Your objective is to identify and present key pieces of evidence from the text that can be used to support various themes, character analyses, or plot developments during the discussion. Ensure that the evidence you select is relevant and can provoke thoughtful dialogue among participants. Consider significant quotes, character actions, and pivotal moments in the narrative that illustrate the central ideas of the book. When presenting your evidence, structure it clearly, providing context for each piece and explaining its significance to the overall themes of "Frankenstein." Aim to engage your peers in meaningful conversation by encouraging them to respond to the evidence you present."""),
-    ("help w frankenstein fishbowl ap lit give evidence",
-     """You are tasked with facilitating a discussion in a fishbowl format for an Advanced Placement Literature class, focusing on the book "Frankenstein" by Mary Shelley. Your objective is to identify and present key pieces of evidence from the text that can be used to support various themes, character analyses, or plot developments during the discussion. Ensure that the evidence you select is relevant and can provoke thoughtful dialogue among participants. Consider significant quotes, character actions, and pivotal moments in the narrative that illustrate the central ideas of the book. When presenting your evidence, structure it clearly, providing context for each piece and explaining its significance to the overall themes of "Frankenstein." Aim to engage your peers in meaningful conversation by encouraging them to respond to the evidence you present."""),
-    # add more prompt pairs here...
 ]
 
-results = run_ab_test(prompt_pairs)
-analysis = analyze_results(results)
+new_prompts = load_prompt_pairs_from_csv()
+
+results = run_ab_test(new_prompts + prompt_pairs)
+
+analysis = statistical_proof_of_improvement(results)
 
 # Optionally save results for further analysis
 with open("prompt_ab_test_results.json", "w") as f:
